@@ -1,26 +1,45 @@
-# Density Function Workbench
+# Worldgen Workbench
 
-A browser-based node editor for Minecraft worldgen **density functions** with a live preview. You build the function by wiring nodes together, and the result renders as a 3D chunk pillar or a side or top slice as you edit. It is inspired by [misode's density function generator](https://misode.github.io/worldgen/density-function/) and [jacobsjo's df-editor](https://df-editor.jacobsjo.eu/).
+A browser-based editor for Minecraft worldgen data packs, with a live preview for each kind of file. Projects hold many files that reference each other by id, the same way a data pack does. A noise settings file can point at your own density function, a dimension at your noise settings, and a structure set at your structures. Every preview resolves those references, using your project's files first and vanilla 26.3 data otherwise.
 
-The whole app is one self-contained file, `index.html`. Open it in a browser; it needs no server or install step.
+It is inspired by [misode's generators](https://misode.github.io/) and [jacobsjo's df-editor](https://df-editor.jacobsjo.eu/).
 
-## Features
+The whole app is one self-contained file, `index.html`. It needs no server or install step.
 
-- **Node editor**
-  - Every 26.x density function type is available: math, noise, spline, interval select, gradient, distance to point, find top surface, caching and blending markers, and more.
-  - An input you leave unconnected takes a typed number instead.
-  - Right-click or press <kbd>Space</kbd> to add a node. Dragging a wire onto empty space adds a node and connects it.
-  - Box select, duplicate, undo/redo and auto-layout (Tidy) are built in.
-- **Live preview**, computed in a Web Worker:
-  - **3D chunk:** a pillar of 1×1 up to 4×4 chunks showing the blocks where density > 0. It has terrain colouring (grass, dirt, sand, stone, deepslate, water) and ambient occlusion.
-  - **Side / Top:** 2D slices you can pan and zoom, with several colour maps and a per-block value readout.
-  - **Per-node preview:** the eye icon on a node previews just that node's output.
-- **Accurate maths:** evaluation uses [deepslate](https://github.com/misode/deepslate), the same library misode's site uses. Noise, splines and interpolation should therefore match vanilla.
-- **Vanilla data:** all Minecraft 26.3 noises and density functions are bundled. Any vanilla function loads as a preset, and **Expand** on a reference node replaces it with its full definition.
-- **Import / export:** copy the output as data-pack JSON, or paste JSON in. Pre-26.x types (`y_clamped_gradient`, `flat_cache`, `cache_2d`, `shifted_noise`, `argument1`/`argument2`, …) are converted on import.
-- **Custom noises:** define your own noise parameters and use them in Noise nodes.
+## Previews
 
-Your graph and view settings are saved in your browser's local storage.
+| File type | Preview |
+| --- | --- |
+| Density function | Node graph editor (or raw JSON). Side and top slices, a 3D chunk view, and a per-node preview |
+| Noise | Top and side noise maps |
+| Noise settings | Terrain slice and 3D chunks with aquifers, surface rules and the dimension's biomes |
+| Material rule | The same terrain views with this rule as the surface rule, plus an outline of the rule tree |
+| Dimension | Biome map (with temperature, humidity and the other climate layers), terrain slice, 3D chunk and a summary. Flat generators show their layer stack |
+| World preset | The dimension views above, for any dimension in the preset |
+| Biome parameter list | Biome map, and a climate plot of which biome wins across two climate axes |
+| Structure set | Placement map with spacing grid and biome checks (random spread and concentric rings) |
+| Placed feature | Simulated placements over 1 to 16×16 chunks, top and side views |
+| Feature | 3D preview for ores and trees (trees are approximate), plus a summary |
+| Biome, dimension type, structure, template pool, tags, carver, processor list, … | Info cards: colours, spawns, features by step, vertical range, biome lists, weights |
+
+Every card lists the file's references and which project files use it. Click any of them to open that file.
+
+## Projects and storage
+
+- **Browser storage (default).** Projects are kept in IndexedDB, and edits save automatically.
+- **Folder on disk.** *Open folder* connects a data pack folder through the File System Access API (Chrome and Edge). Edits are written straight to the files in that folder, and changes made on disk by other programs are picked up when you return to the tab. The browser asks for permission again in later sessions; until you reconnect, edits are kept in browser storage and written to the folder afterwards.
+- **Zip.** Import a data pack `.zip` as a new project, or export a project as a `.zip`.
+
+Use *Vanilla* to open any vanilla worldgen file read-only, then *Copy to project* to make an editable copy. Keeping the `minecraft:` id overrides the vanilla file.
+
+## Editing
+
+- **JSON editor:** syntax highlighting and error markers. Inside a string, typing (or <kbd>Ctrl</kbd>+<kbd>Space</kbd>) suggests ids from the project and vanilla data. <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>-click an id to open that file. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> formats the file.
+- **Node editor:**
+  - Right-click or press <kbd>Space</kbd> to add a node, and drag a wire onto empty space to add and connect one.
+  - Reference nodes can be expanded into their definition, or opened.
+  - Box select, duplicate, undo and redo, and Tidy are available.
+- <kbd>Ctrl</kbd>+<kbd>P</kbd> jumps to a file, and <kbd>Ctrl</kbd>+<kbd>S</kbd> saves immediately.
 
 ## Building
 
@@ -30,21 +49,37 @@ The page is generated from the sources in `src/` and the bundled data in `vendor
 python3 build.py
 ```
 
-This writes `index.html`. `python3 build.py --fragment` writes `build/fragment.html` instead: the same page without `<!doctype>`/`<head>`, for hosts that add their own.
+This writes `index.html`. `python3 build.py --fragment` writes `build/fragment.html`, which is the same page without `<!doctype>` and `<head>`, for hosts that add their own.
+
+To refresh the vanilla data from [misode/mcmeta](https://github.com/misode/mcmeta), run:
+
+```bash
+python3 tools/vanilla.py 26.3
+```
 
 | Path | Contents |
 | --- | --- |
 | `src/shell.html` | Markup and styles |
-| `src/graph.js` | Node types, graph model, editor interaction, JSON import/export |
-| `src/preview.js` | Worker management, 2D slice renderer, 3D voxel mesher |
-| `src/main.js` | Presets, toolbar, dialogs, startup |
-| `src/worker.js` | Evaluation engine that runs in the worker |
+| `src/util.js`, `src/data.js` | Helpers, registry list, biome and block colours, new-file templates |
+| `src/project.js` | IndexedDB storage, folder access, zip reading and writing, reference resolution |
+| `src/graph.js` | Density function node editor |
+| `src/code.js` | JSON editor |
+| `src/preview.js` | Worker client, 2D map view, 3D voxel view |
+| `src/renderers.js`, `src/cards.js` | Preview per file type, info cards, feature voxels |
+| `src/workbench.js`, `src/main.js` | Projects, explorer, tabs, dialogs, startup |
+| `src/worker.js` | Evaluation engine that runs in a Web Worker |
 | `vendor/deepslate-0.27.2.umd.js` | deepslate library (MIT) |
-| `vendor/vanilla-26.3.json` | Vanilla noise, density function and noise settings data |
+| `vendor/vanilla-26.3.json` | Vanilla worldgen data |
 
-The 3D view loads [three.js](https://threejs.org/) r128 from cdnjs when it first opens.
+The 3D views load [three.js](https://threejs.org/) r128 from cdnjs when first opened. Vanilla template pools are not bundled; they are fetched from mcmeta on GitHub when you open one.
+
+## Limits
+
+- Feature placement assumes flat ground at the surface Y you choose. Modifiers that depend on blocks are not simulated: block predicates, surface water depth and environment scans always pass.
+- Tree and scattered-ore shapes are approximations. Carvers and jigsaw structure layouts are not rendered.
+- deepslate 0.27.2 does not implement every 26.3 surface rule. The `hole` and `steep` conditions count as false, and the `bandlands` and `ore_vein` rules place nothing, so badlands terracotta bands and ore veins are missing from terrain previews.
 
 ## Credits
 
-- [deepslate](https://github.com/misode/deepslate) by Misode, MIT licence (see `vendor/deepslate-LICENSE`).
+- [deepslate](https://github.com/misode/deepslate) by Misode, MIT licence (see `vendor/deepslate-LICENSE`). It provides noise, density functions, terrain, aquifers, surface rules, biome sources and structure placement.
 - Vanilla worldgen data from [misode/mcmeta](https://github.com/misode/mcmeta), extracted from Minecraft 26.3. Minecraft is a trademark of Mojang Studios; this project is not affiliated with Mojang or Microsoft.

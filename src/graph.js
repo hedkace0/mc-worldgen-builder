@@ -1,45 +1,3 @@
-/* ================= helpers ================= */
-const $ = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-function h(tag, props, ...kids) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(props || {})) {
-    if (v == null || v === false) continue;
-    if (k === 'class') el.className = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-    else if (k === 'html') el.innerHTML = v;
-    else if (k in el && k !== 'list' && k !== 'for') el[k] = v;
-    else el.setAttribute(k, v);
-  }
-  for (const c of kids.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : String(c));
-  return el;
-}
-const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
-const short = (id) => String(id).replace(/^minecraft:/, '');
-const fmt = (v, d = 4) => (Number.isFinite(v) ? (+v.toFixed(d)).toString() : String(v));
-const ICON = {
-  eye: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>',
-  x: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 4 8 8M12 4l-8 8"/></svg>',
-};
-let toastTimer = 0;
-function toast(msg) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
-}
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
-};
-
-/* ================= vanilla data ================= */
-const VANILLA = JSON.parse($('#vanilla-data').textContent);
-const VANILLA_NOISES = Object.keys(VANILLA.noise).sort();
-const VANILLA_DFS = Object.keys(VANILLA.density_function).sort();
-
 /* ================= node types ================= */
 const CATS = [
   ['input', 'Inputs', '--c-input'],
@@ -118,14 +76,9 @@ def('find_top_surface', 'util', 'Find top surface', [
 ]);
 def('output', 'out', 'Final density', [IN('input', 'density', 0)], { noAdd: true });
 
-function num(v, r) {
-  let x = Number(v);
-  if (!Number.isFinite(x)) x = 0;
-  return r && r.int ? Math.round(x) : x;
-}
 
 /* ================= graph model ================= */
-const G = { nodes: new Map(), edges: [], nextId: 1, noises: {} };
+const G = { nodes: new Map(), edges: [], nextId: 1 };
 let previewId = null;
 const selection = new Set();
 
@@ -216,7 +169,7 @@ function titleOf(id) {
 function serialize() {
   return JSON.stringify({
     nodes: [...G.nodes.values()].map(({ id, type, x, y, v, inl }) => ({ id, type, x: Math.round(x), y: Math.round(y), v, inl })),
-    edges: G.edges, nextId: G.nextId, noises: G.noises,
+    edges: G.edges, nextId: G.nextId,
   });
 }
 function deserialize(str) {
@@ -226,7 +179,6 @@ function deserialize(str) {
   if (!G.nodes.has('out')) newNode('output', 0, 0);
   G.edges = (s.edges || []).filter((e) => G.nodes.has(e.src) && G.nodes.has(e.dst));
   G.nextId = s.nextId || 1;
-  G.noises = s.noises || {};
   if (previewId && !G.nodes.has(previewId)) previewId = null;
   for (const id of [...selection]) if (!G.nodes.has(id)) selection.delete(id);
 }
@@ -238,21 +190,22 @@ function commit() {
   history.stack.push(s);
   if (history.stack.length > 120) history.stack.shift();
   history.idx = history.stack.length - 1;
-  store.set('dfw:graph', s);
+  graphCommitted(s);
   updateHistoryButtons();
 }
 function undo() { if (history.idx > 0) { history.idx--; restore(history.stack[history.idx]); } }
 function redo() { if (history.idx < history.stack.length - 1) { history.idx++; restore(history.stack[history.idx]); } }
 function restore(s) {
   deserialize(s);
-  store.set('dfw:graph', s);
+  graphCommitted(s);
   renderAll();
   graphChanged();
   updateHistoryButtons();
 }
 function updateHistoryButtons() {
-  $('#btn-undo').disabled = history.idx <= 0;
-  $('#btn-redo').disabled = history.idx >= history.stack.length - 1;
+  const u = $('#btn-undo'), r = $('#btn-redo');
+  if (u) u.disabled = history.idx <= 0;
+  if (r) r.disabled = history.idx >= history.stack.length - 1;
 }
 
 /* ================= export: graph -> density function JSON ================= */
@@ -564,7 +517,7 @@ function fieldRow(n, r) {
     sel.addEventListener('change', () => { n.v[r.key] = sel.value; graphChanged(); commit(); });
     row.append(sel);
   } else if (r.kind === 'noise' || r.kind === 'ref') {
-    const ids = r.kind === 'noise' ? [...VANILLA_NOISES, ...Object.keys(G.noises)] : VANILLA_DFS;
+    const ids = allIds(r.kind === 'noise' ? 'worldgen/noise' : 'worldgen/density_function').filter((id) => !(r.kind === 'ref' && id === DF_SELF.id));
     const cur = n.v[r.key];
     const known = ids.includes(cur);
     const opts = ids.map((id) => h('option', { value: id, selected: id === cur }, short(id)));
@@ -578,8 +531,14 @@ function fieldRow(n, r) {
     });
     row.firstChild.remove();
     row.append(sel);
-    if (r.kind === 'ref' && VANILLA.density_function[cur] !== undefined) {
-      const btn = h('button', { class: 'mini', type: 'button', title: 'Replace this reference with its vanilla definition' }, 'Expand');
+    const reg = r.kind === 'noise' ? 'worldgen/noise' : 'worldgen/density_function';
+    if (known) {
+      const open = h('button', { class: 'mini icon', type: 'button', title: 'Open ' + short(cur), html: ICON.open });
+      open.addEventListener('click', () => openRef(reg, cur));
+      row.append(open);
+    }
+    if (r.kind === 'ref' && resolveJson(reg, cur) !== undefined) {
+      const btn = h('button', { class: 'mini', type: 'button', title: 'Replace this reference with its definition' }, 'Expand');
       btn.addEventListener('click', () => expandReference(n.id));
       row.append(btn);
     }
@@ -1076,7 +1035,7 @@ function firstInputKey(n) {
 /* ---------- reference expansion ---------- */
 function expandReference(id) {
   const n = G.nodes.get(id);
-  const json = VANILLA.density_function[n.v.id];
+  const json = resolveJson('worldgen/density_function', n.v.id);
   if (json === undefined) return;
   importWarnings = [];
   const created = [];
@@ -1154,6 +1113,7 @@ function duplicateSelection() {
 }
 
 document.addEventListener('keydown', (ev) => {
+  if (!dfActive()) return;
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
   if ($('.modal-back')) return;

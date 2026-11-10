@@ -13,7 +13,8 @@ shell = (src / 'shell.html').read_text()
 vanilla = json.dumps(json.loads((ven / 'vanilla-26.3.json').read_text()), separators=(',', ':')).replace('</', '<\\/')
 ds = (ven / 'deepslate-0.27.2.umd.js').read_text()
 engine = (src / 'worker.js').read_text()
-app = '\n'.join((src / f).read_text() for f in ['graph.js', 'preview.js', 'main.js'])
+MODULES = ['util.js', 'data.js', 'project.js', 'graph.js', 'preview.js', 'renderers.js', 'cards.js', 'code.js', 'workbench.js', 'main.js']
+app = '\n'.join((src / f).read_text() for f in MODULES)
 for name, text in [('deepslate', ds), ('worker.js', engine), ('app', app)]:
     assert '</script' not in text.lower(), f'{name} contains </script'
 
@@ -35,7 +36,7 @@ else:
     head = head.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', '')
     out = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
-           '<meta name="description" content="Node editor for Minecraft worldgen density functions with live side, top and 3D chunk previews.">\n'
+           '<meta name="description" content="Minecraft worldgen data pack editor with live previews: density function node graphs, terrain, biome maps, structure and feature placement.">\n'
            '<style>body{margin:0}[hidden]{display:none!important}</style>\n'
            + head + '</head>\n<body>\n' + sep + rest + '</body>\n</html>\n')
 out_path.write_text(out)
