@@ -499,6 +499,7 @@ const world = $('#world');
 const wiresSvg = $('#wires');
 const nodeEls = new Map();
 const view = { x: 0, y: 0, z: 1 };
+let viewTouched = false;
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 function applyView() {
@@ -520,6 +521,8 @@ function fitView() {
     x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x + w); y1 = Math.max(y1, n.y + hh);
   }
   const r = editor.getBoundingClientRect();
+  if (r.width < 40 || r.height < 40) return;
+  viewTouched = false;
   const pad = 50;
   const z = Math.min(1, Math.max(0.05, Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2) / (y1 - y0))));
   view.z = z;
@@ -838,6 +841,7 @@ editor.addEventListener('pointermove', (ev) => {
   if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
   if (drag.kind === 'pan') {
     view.x = drag.vx + dx; view.y = drag.vy + dy;
+    viewTouched = true;
     applyView();
   } else if (drag.kind === 'node') {
     for (const [id, x, y] of drag.starts) {
@@ -883,8 +887,11 @@ editor.addEventListener('wheel', (ev) => {
   view.x = mx - (mx - view.x) * (z / view.z);
   view.y = my - (my - view.y) * (z / view.z);
   view.z = z;
+  viewTouched = true;
   applyView();
 }, { passive: false });
+// keep the whole graph in view while the editor resizes, until the user pans or zooms
+new ResizeObserver(() => { if (!viewTouched) fitView(); }).observe(editor);
 editor.addEventListener('contextmenu', (ev) => {
   if (ev.target.closest('input, select, textarea')) return;
   ev.preventDefault();
