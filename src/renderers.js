@@ -706,13 +706,22 @@ RENDERERS['worldgen/placed_feature'] = {
 RENDERERS['worldgen/feature'] = {
   key: 'cf',
   modes: () => [{ id: '3d', label: '3D', kind: '3d' }, { id: 'info', label: 'Info', kind: 'card' }],
-  controls: (mode) => (mode === '3d' ? [{ type: 'button', key: 'reset', label: 'Reset view', onClick: resetCamera }] : []),
+  controls: (mode) => (mode === '3d' ? [
+    { key: 'cf-ground', label: 'Ground', type: 'check', def: true },
+    { type: 'button', key: 'reseed', label: 'Another one', onClick: () => { PV.vals['cf-n'] = (PV.vals['cf-n'] || 0) + 1; savePv(); scheduleEval(0); } },
+    { type: 'button', key: 'reset', label: 'Reset view', onClick: resetCamera },
+  ] : []),
   run(mode) {
     if (mode === 'info') { cardFeature(); return; }
-    const res = featureVoxels(TARGET.json, seedValue());
-    if (!res) { clear3d(); setStatus(`No 3D preview for ${typeOf(TARGET.json) || 'this'} features yet. See Info.`); return; }
-    const solid = meshBlocks(res, {});
-    setStatus(`${res.label} · ${solid} blocks${res.approx ? ' · approximate shape' : ''}`);
+    const res = featureVoxels(TARGET.json, seedValue() + ':' + (PV.vals['cf-n'] || 0), { ground: ctlVal('cf-ground', true) });
+    if (res.empty) {
+      clear3d();
+      setStatus(`Nothing to show for ${short(typeOf(resolveFeatureJson(TARGET.json)) || 'this feature')}${res.skipped.length ? ` (not simulated: ${res.skipped.join(', ')})` : ''}. See Info.`);
+      return;
+    }
+    meshBlocks(res, {});
+    PV.note = res.skipped.length ? `Not simulated: ${res.skipped.join(', ')}` : '';
+    setStatus(`${res.label || short(typeOf(resolveFeatureJson(TARGET.json)))} · ${res.count.toLocaleString()} blocks${res.approx ? ' · approximate shape' : ''}`);
   },
 };
 

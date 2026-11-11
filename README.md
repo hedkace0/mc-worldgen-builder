@@ -19,7 +19,7 @@ The whole app is one self-contained file, `index.html`. It needs no server or in
 | Biome parameter list | Biome map, and a climate plot of which biome wins across two climate axes |
 | Structure set | Placement map with spacing grid and biome checks (random spread and concentric rings) |
 | Placed feature | Simulated placements over 1 to 16×16 chunks, top and side views |
-| Feature | 3D preview for ores and trees (trees are approximate), plus a summary |
+| Feature | 3D preview on a ground or ceiling plane for nearly every vanilla feature type, including nested patches and selectors, plus a summary |
 | Biome, dimension type, structure, template pool, tags, carver, processor list, … | Info cards: colours, spawns, features by step, vertical range, biome lists, weights |
 
 Every card lists the file's references and which project files use it. Click any of them to open that file.
@@ -65,7 +65,8 @@ python3 tools/vanilla.py 26.3
 | `src/graph.js` | Density function node editor |
 | `src/code.js` | JSON editor |
 | `src/preview.js` | Worker client, 2D map view, 3D voxel view |
-| `src/renderers.js`, `src/cards.js` | Preview per file type, info cards, feature voxels |
+| `src/renderers.js`, `src/cards.js` | Preview per file type, info cards |
+| `src/features.js` | Configured feature placement in a small virtual world |
 | `src/workbench.js`, `src/main.js` | Projects, explorer, tabs, dialogs, startup |
 | `src/worker.js` | Evaluation engine that runs in a Web Worker |
 | `vendor/deepslate-0.27.2.umd.js` | deepslate library (MIT) |
@@ -76,7 +77,7 @@ The 3D views load [three.js](https://threejs.org/) r128 from cdnjs when first op
 ## Limits
 
 - Feature placement assumes flat ground at the surface Y you choose. Modifiers that depend on blocks are not simulated: block predicates, surface water depth and environment scans always pass.
-- Tree and scattered-ore shapes are approximations. Carvers and jigsaw structure layouts are not rendered.
+- Feature previews port the vanilla algorithms for trees (all trunk and foliage placers except 26.3's poplar), ores, huge mushrooms and fungi, ice spikes, End features, chorus plants, bamboo, piles, disks, lakes and coral. Geodes, icebergs, dripstone, basalt columns, sculk and poplar trees are approximate shapes and are labelled as such. Features built from structure templates (fossils, the desert well) are not rendered, nor are carvers or jigsaw structure layouts.
 - deepslate 0.27.2 does not implement every 26.3 surface rule. The `hole` and `steep` conditions count as false, and the `bandlands` and `ore_vein` rules place nothing, so badlands terracotta bands and ore veins are missing from terrain previews.
 
 ## Credits
