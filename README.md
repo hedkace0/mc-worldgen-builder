@@ -4,7 +4,9 @@ A browser-based editor for Minecraft worldgen data packs, with a live preview fo
 
 It is inspired by [misode's generators](https://misode.github.io/) and [jacobsjo's df-editor](https://df-editor.jacobsjo.eu/).
 
-The whole app is one self-contained file, `index.html`. It needs no server or install step.
+**Try it online:** https://hedkace0.github.io/mc-worldgen-builder/
+
+The whole app is one self-contained file, `index.html`. It needs no server or install step. You can also download it and open it locally.
 
 ## Previews
 
